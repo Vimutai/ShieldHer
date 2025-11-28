@@ -1,0 +1,150 @@
+/* 
+ * Digital Footprint Shield - Global Styles
+ * Colors: Deep Purple #4B2E83, Sunrise Orange #F79E38, 
+ *         Soft Cream #F7F4ED, Charcoal #1A1A1A, Light Lilac #EDE6F7
+ */
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Base styles */
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+  
+  body {
+    @apply font-body text-charcoal bg-soft-cream;
+    font-size: 16px;
+    line-height: 1.6;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-heading font-semibold text-deep-purple;
+  }
+
+  /* Focus styles for accessibility */
+  *:focus-visible {
+    @apply outline-2 outline-offset-2 outline-sunrise-orange;
+  }
+}
+
+/* Component utilities */
+@layer components {
+  /* Primary button - empowering orange */
+  .btn-primary {
+    @apply bg-sunrise-orange text-white font-semibold 
+           py-3 px-6 rounded-2xl shadow-soft
+           hover:shadow-glow hover:scale-[1.02]
+           active:scale-[0.98]
+           transition-all duration-200
+           focus-visible:ring-2 focus-visible:ring-deep-purple;
+  }
+
+  /* Secondary button - outlined purple */
+  .btn-secondary {
+    @apply bg-transparent text-deep-purple font-semibold
+           py-3 px-6 rounded-2xl border-2 border-deep-purple
+           hover:bg-light-lilac hover:shadow-soft
+           active:scale-[0.98]
+           transition-all duration-200;
+  }
+
+  /* Card component */
+  .card {
+    @apply bg-white rounded-2xl shadow-soft p-6
+           border border-light-lilac/50;
+  }
+
+  /* Input field */
+  .input-field {
+    @apply w-full px-4 py-3 rounded-xl
+           border-2 border-light-lilac
+           focus:border-deep-purple focus:ring-2 focus:ring-light-lilac
+           transition-all duration-200
+           bg-white;
+  }
+
+  /* Textarea */
+  .textarea-field {
+    @apply w-full px-4 py-3 rounded-xl
+           border-2 border-light-lilac
+           focus:border-deep-purple focus:ring-2 focus:ring-light-lilac
+           transition-all duration-200
+           bg-white resize-none;
+  }
+
+  /* Privacy badge */
+  .privacy-badge {
+    @apply inline-flex items-center gap-1.5
+           text-xs text-deep-purple/70
+           bg-light-lilac/50 px-3 py-1.5 rounded-full;
+  }
+
+  /* Score gauge wrapper */
+  .score-gauge {
+    @apply relative w-32 h-32 mx-auto;
+  }
+
+  /* Blurred preview for screenshot protection */
+  .blurred-preview {
+    @apply blur-md select-none pointer-events-none
+           transition-all duration-300;
+  }
+
+  .blurred-preview.revealed {
+    @apply blur-none pointer-events-auto;
+  }
+
+  /* Watermark overlay for PDFs */
+  .watermark-overlay {
+    @apply absolute inset-0 flex items-center justify-center
+           pointer-events-none z-10
+           text-deep-purple/10 font-heading text-2xl
+           rotate-[-30deg];
+  }
+}
+
+/* Animations */
+@layer utilities {
+  .animate-stagger > * {
+    animation: slideUp 0.4s ease-out forwards;
+    opacity: 0;
+  }
+  
+  .animate-stagger > *:nth-child(1) { animation-delay: 0.1s; }
+  .animate-stagger > *:nth-child(2) { animation-delay: 0.2s; }
+  .animate-stagger > *:nth-child(3) { animation-delay: 0.3s; }
+  .animate-stagger > *:nth-child(4) { animation-delay: 0.4s; }
+  .animate-stagger > *:nth-child(5) { animation-delay: 0.5s; }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-light-lilac/30;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-deep-purple/30 rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-deep-purple/50;
+}
+
+/* Print styles for PDF export */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  
+  body {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+}

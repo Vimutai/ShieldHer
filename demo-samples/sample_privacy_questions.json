@@ -1,0 +1,121 @@
+{
+  "description": "Sample assessment responses for testing the Score Calculator",
+  "scenarios": [
+    {
+      "name": "High Risk User",
+      "description": "User with many unsafe practices",
+      "answers": {
+        "social_public": true,
+        "location_sharing": true,
+        "real_name": true,
+        "password_reuse": true,
+        "two_factor": false,
+        "personal_info": true,
+        "photo_sharing": true,
+        "friend_lists": true,
+        "google_yourself": false,
+        "data_broker": false
+      },
+      "expected_score_range": [0, 30]
+    },
+    {
+      "name": "Security-Conscious User",
+      "description": "User who follows good security practices",
+      "answers": {
+        "social_public": false,
+        "location_sharing": false,
+        "real_name": false,
+        "password_reuse": false,
+        "two_factor": true,
+        "personal_info": false,
+        "photo_sharing": false,
+        "friend_lists": false,
+        "google_yourself": true,
+        "data_broker": true
+      },
+      "expected_score_range": [90, 100]
+    },
+    {
+      "name": "Average User",
+      "description": "User with mixed practices",
+      "answers": {
+        "social_public": true,
+        "location_sharing": false,
+        "real_name": true,
+        "password_reuse": true,
+        "two_factor": true,
+        "personal_info": false,
+        "photo_sharing": true,
+        "friend_lists": true,
+        "google_yourself": false,
+        "data_broker": false
+      },
+      "expected_score_range": [40, 60]
+    }
+  ],
+  "questions": [
+    {
+      "id": "social_public",
+      "text": "Are any of your social media profiles set to public?",
+      "category": "visibility",
+      "weight": 3
+    },
+    {
+      "id": "location_sharing",
+      "text": "Do you share your location on social media?",
+      "category": "location",
+      "weight": 4
+    },
+    {
+      "id": "real_name",
+      "text": "Do you use your real full name on most accounts?",
+      "category": "identity",
+      "weight": 2
+    },
+    {
+      "id": "password_reuse",
+      "text": "Do you use the same password for multiple accounts?",
+      "category": "security",
+      "weight": 4
+    },
+    {
+      "id": "two_factor",
+      "text": "Have you enabled 2FA on important accounts?",
+      "category": "security",
+      "weight": 3,
+      "invertScore": true
+    },
+    {
+      "id": "personal_info",
+      "text": "Is your phone/address visible on any profiles?",
+      "category": "identity",
+      "weight": 5
+    },
+    {
+      "id": "photo_sharing",
+      "text": "Do you share photos that show your home/workplace?",
+      "category": "location",
+      "weight": 3
+    },
+    {
+      "id": "friend_lists",
+      "text": "Are your friend/follower lists public?",
+      "category": "network",
+      "weight": 2
+    },
+    {
+      "id": "google_yourself",
+      "text": "Have you Googled yourself recently?",
+      "category": "awareness",
+      "weight": 2,
+      "invertScore": true
+    },
+    {
+      "id": "data_broker",
+      "text": "Have you checked data broker sites?",
+      "category": "awareness",
+      "weight": 2,
+      "invertScore": true
+    }
+  ]
+}

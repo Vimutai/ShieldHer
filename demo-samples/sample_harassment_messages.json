@@ -1,0 +1,70 @@
+{
+  "description": "Sample harassment messages for testing the Response Assistant - Kenya context",
+  "note": "These are fictional examples for demonstration purposes only",
+  "legal_reference": "Computer Misuse and Cybercrimes Act 2018 (Kenya)",
+  "messages": [
+    {
+      "id": 1,
+      "category": "threats",
+      "severity": "severe",
+      "text": "I know where you live in Westlands. You better watch yourself because I'm coming for you.",
+      "expected_categories": ["threats", "stalking"],
+      "applicable_kenya_law": "Section 28 - Cyber threats (up to 10 years imprisonment)"
+    },
+    {
+      "id": 2,
+      "category": "insults",
+      "severity": "medium",
+      "text": "You're so pathetic. Wewe ni mjinga. Nobody likes you, you worthless loser.",
+      "expected_categories": ["insults"],
+      "applicable_kenya_law": "Section 27 - Cyberbullying (up to 2 years imprisonment)"
+    },
+    {
+      "id": 3,
+      "category": "manipulation",
+      "severity": "medium",
+      "text": "After everything I did for you? Kosa lako. You made me do this. You owe me. Utajuta.",
+      "expected_categories": ["manipulation"],
+      "applicable_kenya_law": "Section 27 - Cyberbullying"
+    },
+    {
+      "id": 4,
+      "category": "doxxing",
+      "severity": "high",
+      "text": "I found your phone number. Nitawaambia watu wote. Your family and friends will know what you really are. Nitapost mtandaoni.",
+      "expected_categories": ["doxxing", "manipulation"],
+      "applicable_kenya_law": "Section 24 Sexual Offences Act & Section 22 CMCA"
+    },
+    {
+      "id": 5,
+      "category": "intimate_images",
+      "severity": "severe",
+      "text": "Send me nudes or I'll leak the photos I have of you. Everyone will see. I'll make them viral on Kenyan Twitter.",
+      "expected_categories": ["sexual", "intimate_images", "threats"],
+      "applicable_kenya_law": "Section 24 Sexual Offences Act - up to 5 years imprisonment"
+    },
+    {
+      "id": 6,
+      "category": "stalking",
+      "severity": "severe",
+      "text": "Nakufuata. I saw you at Junction Mall yesterday. I know where you work in Upper Hill. Nitakupata.",
+      "expected_categories": ["stalking", "threats"],
+      "applicable_kenya_law": "Section 28 CMCA - Cyber stalking"
+    },
+    {
+      "id": 7,
+      "category": "sexual_harassment",
+      "severity": "high",
+      "text": "You're so hot. Tuma picha zako. I want to see your body. Don't ignore me. Tukutane leo usiku.",
+      "expected_categories": ["sexual"],
+      "applicable_kenya_law": "Sexual Offences Act - Sexual harassment"
+    }
+  ],
+  "kenya_resources": {
+    "dci_cybercrime": "0800 723 253 (toll-free)",
+    "gbv_hotline": "1195",
+    "fida_kenya": "+254 20 271 5808",
+    "police_emergency": "999 / 112"
+  },
+  "usage": "Import this file in tests or use these examples to demo the Response Assistant with Kenya context"
+}

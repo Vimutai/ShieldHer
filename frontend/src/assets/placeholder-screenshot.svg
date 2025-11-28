@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300">
+  <!-- Placeholder for tutorial screenshots -->
+  <rect width="400" height="300" fill="#EDE6F7"/>
+  
+  <!-- Border -->
+  <rect 
+    x="10" y="10" 
+    width="380" height="280" 
+    fill="none" 
+    stroke="#4B2E83" 
+    stroke-width="2"
+    stroke-dasharray="10,5"
+    rx="10"
+  />
+  
+  <!-- Image icon -->
+  <g transform="translate(150, 100)">
+    <rect x="0" y="0" width="100" height="80" fill="#4B2E83" opacity="0.2" rx="5"/>
+    <circle cx="30" cy="25" r="12" fill="#F79E38"/>
+    <path d="M10 70 L40 45 L60 60 L90 35 L90 70 Z" fill="#4B2E83" opacity="0.5"/>
+  </g>
+  
+  <!-- Text -->
+  <text 
+    x="200" y="220" 
+    font-family="sans-serif" 
+    font-size="14" 
+    fill="#4B2E83" 
+    text-anchor="middle"
+  >
+    Screenshot Placeholder
+  </text>
+  
+  <text 
+    x="200" y="245" 
+    font-family="sans-serif" 
+    font-size="12" 
+    fill="#4B2E83" 
+    opacity="0.7"
+    text-anchor="middle"
+  >
+    Add platform-specific tutorial image
+  </text>
+</svg>

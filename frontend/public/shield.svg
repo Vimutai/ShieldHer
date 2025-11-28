@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Digital Footprint Shield - Favicon/Public Asset -->
+  <defs>
+    <linearGradient id="shieldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#4B2E83" />
+      <stop offset="100%" style="stop-color:#F79E38" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Shield shape -->
+  <path 
+    d="M50 5 L90 20 L90 50 C90 75 70 90 50 95 C30 90 10 75 10 50 L10 20 Z" 
+    fill="url(#shieldGrad)"
+  />
+  
+  <!-- Inner area -->
+  <path 
+    d="M50 15 L80 27 L80 50 C80 70 65 82 50 86 C35 82 20 70 20 50 L20 27 Z" 
+    fill="#F7F4ED"
+  />
+  
+  <!-- Checkmark -->
+  <path 
+    d="M35 50 L45 60 L65 40" 
+    fill="none"
+    stroke="#4B2E83"
+    stroke-width="6"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+</svg>
