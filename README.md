@@ -6,6 +6,20 @@ A privacy-focused MVP application that helps users assess their digital safety, 
 
 ---
 
+## 👥 Team Members
+
+- **[Egrah Savai](mailto:savaiegrah@gmail.com)** - +254742651608
+
+- **[Vivian Mutai](mailto:Vivyearnjepkorir@gmail.com)** - +254704067949
+
+- **[Christine Wambui](mailto:tinabakari26@gmail.com)** - +254710763375
+
+- **[Hibaq Kuresh](mailto:hibaqku7@gmail.com)** - +254707301008
+
+_Mary Njengah has left the project_
+
+---
+
 ## 🚀 Quick Start
 
 ### Frontend Only (Recommended for Hackathon)
@@ -72,13 +86,13 @@ digital-footprint-shield/
 
 ## 🎨 Brand Colors
 
-| Color | Hex | Usage |
-|-------|-----|-------|
-| Deep Purple | `#4B2E83` | Primary, headers |
-| Sunrise Orange | `#F79E38` | Accent, CTAs |
-| Soft Cream | `#F7F4ED` | Background |
-| Charcoal | `#1A1A1A` | Body text |
-| Light Lilac | `#EDE6F7` | Secondary backgrounds |
+| Color          | Hex       | Usage                 |
+| -------------- | --------- | --------------------- |
+| Deep Purple    | `#4B2E83` | Primary, headers      |
+| Sunrise Orange | `#F79E38` | Accent, CTAs          |
+| Soft Cream     | `#F7F4ED` | Background            |
+| Charcoal       | `#1A1A1A` | Body text             |
+| Light Lilac    | `#EDE6F7` | Secondary backgrounds |
 
 ---
 
@@ -112,6 +126,7 @@ npx vercel
 ### Backend → Railway/Render
 
 #### Railway
+
 1. Create new project at [Railway](https://railway.app)
 2. Connect GitHub repo
 3. Set root directory to `backend`
@@ -120,6 +135,7 @@ npx vercel
    - `ANTHROPIC_API_KEY`
 
 #### Render
+
 1. Create new Web Service at [Render](https://render.com)
 2. Connect GitHub repo
 3. Set root directory: `backend`
@@ -159,6 +175,7 @@ The app works fully offline with keyword-based analysis. To enable AI-powered re
 ## ⚠️ Screenshot Protection Note
 
 **Complete screenshot prevention is impossible.** This app implements:
+
 - Blurred preview mode with 5-second ephemeral reveal
 - Watermark overlay on exported PDFs
 - Visual deterrents for casual screenshotting
@@ -185,6 +202,7 @@ MIT License - Built for hackathon use.
 ## 🤝 Contributing
 
 This is an MVP built for a 24-48 hour hackathon. PRs welcome for:
+
 - Accessibility improvements
 - Additional language support
 - Enhanced AI integrations
