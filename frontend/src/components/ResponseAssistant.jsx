@@ -1,116 +1,331 @@
-/**
- * ResponseAssistant Component
- * Analyzes harassment messages and generates 4 response templates
- * ENHANCED: Kenya-specific legal references, Swahili support, blurred preview
- */
-import { useState, useRef } from 'react'
-import { analyzeMessage, generateResponses } from '../utils/messageAnalyzer'
-import jsPDF from 'jspdf'
-import html2canvas from 'html2canvas'
+import React, { useState, useRef, useEffect } from 'react';
+import { analyzeEvidence } from '../services/api';
 
-function ResponseAssistant() {
+function ResponseAssistant({ importedEvidence, showSwahili, onBack, analysisResult }) {
   const [inputMessage, setInputMessage] = useState('')
-  const [analysis, setAnalysis] = useState(null)
+  const [analysis, setAnalysis] = useState(analysisResult || null)
   const [isLoading, setIsLoading] = useState(false)
   const [blurredMode, setBlurredMode] = useState(true)
   const [revealedIndex, setRevealedIndex] = useState(null)
   const [copiedIndex, setCopiedIndex] = useState(null)
-  const [showSwahili, setShowSwahili] = useState(false)
   const [attachedScreenshots, setAttachedScreenshots] = useState([])
-  const [previewImage, setPreviewImage] = useState(null)
   const fileInputRef = useRef(null)
-  const responsesRef = useRef(null)
 
-  // Handle screenshot upload
-  const handleFileUpload = (event) => {
-    const files = Array.from(event.target.files)
-    const maxFiles = 5
-    const maxSize = 5 * 1024 * 1024 // 5MB per file
+  // Enhanced message analyzer with Kenya-specific patterns
+  const analyzeMessage = (text) => {
+    if (!text || typeof text !== 'string') {
+      return { severity: 'Low', categories: ['unknown'], score: 0 }
+    }
 
-    files.forEach(file => {
-      if (attachedScreenshots.length >= maxFiles) {
-        alert(showSwahili 
-          ? `Upeo wa picha ${maxFiles} tu`
-          : `Maximum ${maxFiles} screenshots allowed`)
-        return
+    const lowerText = text.toLowerCase()
+    const detectedCategories = []
+    let totalScore = 0
+
+    // Enhanced harassment patterns
+    const HARASSMENT_PATTERNS = {
+      threats: {
+        keywords: ['kill', 'hurt', 'harm', 'attack', 'find you', 'coming for', 'watch out', 
+                   'destroy', 'ruin', 'end you', 'make you pay', 'regret', 'sorry',
+                   'kuua', 'kuumiza', 'kukumaliza', 'nitakupata'],
+        weight: 5,
+      },
+      sexual: {
+        keywords: ['sexy', 'nudes', 'naked', 'body', 'send pics', 'hot', 'beautiful body',
+                   'want you', 'together', 'meet up', 'send photos',
+                   'picha zako', 'mwili wako', 'tukutane'],
+        weight: 4,
+      },
+      insults: {
+        keywords: ['ugly', 'stupid', 'worthless', 'pathetic', 'loser', 'disgusting',
+                   'fat', 'dumb', 'idiot', 'trash', 'garbage', 'whore', 'slut',
+                   'useless', 'nobody', 'waste', 'mwizi', 'malaya', 'mjinga', 'bure'],
+        weight: 3,
+      },
+      manipulation: {
+        keywords: ['no one will believe', 'your fault', 'you made me', 'if you loved',
+                   'you owe me', 'after everything', 'you deserve', 'crazy',
+                   'everyone will know', 'i will tell', "you'll regret",
+                   'kosa lako', 'utajuta', 'nitawaambia watu'],
+        weight: 3,
+      },
+    }
+
+    // Check each pattern category
+    Object.entries(HARASSMENT_PATTERNS).forEach(([category, { keywords, weight }]) => {
+      const found = keywords.some(keyword => lowerText.includes(keyword))
+      if (found) {
+        detectedCategories.push(category)
+        totalScore += weight
       }
-
-      if (file.size > maxSize) {
-        alert(showSwahili
-          ? 'Faili ni kubwa sana. Upeo ni 5MB.'
-          : 'File too large. Maximum size is 5MB.')
-        return
-      }
-
-      if (!file.type.startsWith('image/')) {
-        alert(showSwahili
-          ? 'Tafadhali pakia picha tu (PNG, JPG, etc.)'
-          : 'Please upload images only (PNG, JPG, etc.)')
-        return
-      }
-
-      const reader = new FileReader()
-      reader.onload = (e) => {
-        const newScreenshot = {
-          id: Date.now() + Math.random(),
-          name: file.name,
-          data: e.target.result,
-          timestamp: new Date().toISOString(),
-        }
-        setAttachedScreenshots(prev => [...prev, newScreenshot])
-      }
-      reader.readAsDataURL(file)
     })
 
-    // Reset input
-    event.target.value = ''
+    // Determine severity based on total score
+    let severity = 'Low'
+    if (totalScore >= 8) severity = 'High'
+    else if (totalScore >= 5) severity = 'High'
+    else if (totalScore >= 3) severity = 'Medium'
+
+    // Special case for strong insults - "ugly" should be at least Medium
+    if (detectedCategories.includes('insults') && totalScore >= 2) {
+      severity = 'Medium'
+    }
+
+    return {
+      severity,
+      categories: detectedCategories.length > 0 ? detectedCategories : ['general harassment'],
+      score: totalScore,
+    }
   }
 
-  // Remove a screenshot
-  const removeScreenshot = (id) => {
-    setAttachedScreenshots(prev => prev.filter(s => s.id !== id))
+  // Auto-populate from imported evidence and use analysis result
+  useEffect(() => {
+    if (importedEvidence.length > 0 && !inputMessage) {
+      const firstEvidence = importedEvidence[0]
+      if (firstEvidence.evidence?.content) {
+        setInputMessage(firstEvidence.evidence.content)
+      }
+    }
+
+    // If analysis result is passed from parent, use it
+    if (analysisResult && !analysis) {
+      setAnalysis(analysisResult)
+    }
+  }, [importedEvidence, analysisResult])
+
+  // Generate response templates based on severity
+  const generateResponses = (severity, categories = []) => {
+    const baseResponses = [
+      {
+        type: 'calm',
+        text: generateCalmResponse(severity, categories),
+        textSw: generateCalmResponseSwahili(severity, categories),
+        note: 'Use when you want to set boundaries without escalating',
+        noteSw: 'Tumia unapotaka kuweka mipaka bila kuzidisha mvutano'
+      },
+      {
+        type: 'legal',
+        text: generateLegalResponse(severity, categories),
+        textSw: generateLegalResponseSwahili(severity, categories),
+        note: 'References specific Kenyan laws - may deter further contact',
+        noteSw: 'Inarejelea sheria maalum za Kenya - inaweza kuzuia mawasiliano zaidi'
+      },
+      {
+        type: 'supportive',
+        text: generateSupportiveResponse(severity, categories),
+        textSw: generateSupportiveResponseSwahili(severity, categories),
+        note: 'Shows you have support while offering them help resources',
+        noteSw: 'Inaonyesha una msaada huku ukimpa mwongozo wa rasilimali'
+      },
+      {
+        type: 'report',
+        text: generateReportTemplate(severity, categories),
+        textSw: generateReportTemplateSwahili(severity, categories),
+        note: 'Clear statement that you\'re taking formal action',
+        noteSw: 'Taarifa wazi kwamba unachukua hatua za kisheria'
+      }
+    ]
+
+    // Add additional responses for high severity
+    if (severity === 'High') {
+      baseResponses.push({
+        type: 'emergency',
+        text: "I have reported this to the authorities. Your threats have been documented under Kenya's cybercrime laws. Do not contact me again.",
+        textSw: "Nimeripoti hii kwa mamlaka. Tishio lako limeandikwa chini ya sheria za makosa ya mtandao nchini Kenya. Usiniite tena.",
+        note: "For immediate threats - shows you've already taken action",
+        noteSw: "Kwa vitisho vya haraka - inaonyesha tayari umechukua hatua"
+      })
+    }
+
+    return baseResponses
   }
 
-  // Open image preview
-  const openPreview = (screenshot) => {
-    setPreviewImage(screenshot)
+  // Response generators
+  const generateCalmResponse = (severity, categories) => {
+    if (categories.includes('insults')) {
+      return "I don't appreciate personal attacks. Let's keep our communication respectful, or I won't be able to continue this conversation."
+    }
+    return "I don't appreciate this message. Please stop contacting me.";
   }
 
-  // Close image preview
-  const closePreview = () => {
-    setPreviewImage(null)
+  const generateCalmResponseSwahili = (severity, categories) => {
+    if (categories.includes('insults')) {
+      return "Sipendi mashambulio ya kibinafsi. Tuweke mawasiliano yetu ya heshima, au sitoweza kuendelea na mazungumzo haya."
+    }
+    return "Sipendi ujumbe huu. Tafadhali acha kunipigia simu.";
   }
 
-  // Handle message analysis
-  const handleAnalyze = async () => {
+  const generateLegalResponse = (severity, categories) => {
+    if (categories.includes('insults')) {
+      return "Your message containing personal insults violates Kenya's Computer Misuse and Cybercrimes Act 2018 (Section 27 - Cyberbullying). I've documented this as evidence and will report further harassment to DCI Cybercrime Unit."
+    }
+    return "Your message violates Kenya's Computer Misuse and Cybercrimes Act 2018. I've preserved this as evidence and will report it to DCI Cybercrime Unit if it continues.";
+  }
+
+  const generateLegalResponseSwahili = (severity, categories) => {
+    if (categories.includes('insults')) {
+      return "Ujumbe wako unao mashambulio ya kibinafsi unakiuka Sheria ya Makosa ya Mtandao ya Kenya 2018 (Kifungu 27 - Unyanyasaji mtandaoni). Nimeuhifadhi kama ushahidi na nitaripoti unyanyasaji zaidi kwa DCI."
+    }
+    return "Ujumbe wako unakiuka Sheria ya Makosa ya Mtandao ya Kenya 2018. Nimeuhifadhi kama ushahidi na nitaripoti kwa DCI ikiwa utaendelea.";
+  }
+
+  const generateSupportiveResponse = (severity, categories) => {
+    if (categories.includes('insults')) {
+      return "I'm sharing this insulting message with my support network. No one deserves to be spoken to this way. Remember that hurtful words say more about the sender than about you."
+    }
+    return "I'm sharing this with my support network. If you're going through something, please contact a helpline instead of taking it out on others.";
+  }
+
+  const generateSupportiveResponseSwahili = (severity, categories) => {
+    if (categories.includes('insults')) {
+      return "Ninashiriki ujumbe huu wa kutumia matusi na mtandao wangu wa msaada. Hakuna anayestahili kuongewa hivi. Kumbuka kwamba maneno machungu yanasema zaidi kuhusu mtumaji kuliko wewe."
+    }
+    return "Ninashiriki hii na mtandao wangu wa msaada. Ikiwa unapita kwenye changamoto, tafadhali wasiliana na mstari wa msaada badala ya kumlenga mwingine.";
+  }
+
+  const generateReportTemplate = (severity, categories) => {
+    if (categories.includes('insults')) {
+      return "REPORT: User sent harassing messages containing personal insults ('ugly'). This violates platform community guidelines and Kenya's cyberbullying laws. Evidence attached."
+    }
+    return "This message has been documented and will be included in my report to authorities. Kenya's laws protect citizens from online harassment.";
+  }
+
+  const generateReportTemplateSwahili = (severity, categories) => {
+    if (categories.includes('insults')) {
+      return "RIPOTI: Mtumiaji alitumia ujumbe wa unyanyasaji unao matusi ya kibinafsi ('mwenye sura mbaya'). Hii inakiwa miongozo ya jukwaa na sheria za Kenya za unyanyasaji mtandaoni."
+    }
+    return "Ujumbe huu umeandikwa na utajumuishwa kwenye ripoti yangu kwa mamlaka. Sheria za Kenya zinawlinda raia dhidi ya unyanyasaji wa mtandaoni.";
+  }
+
+  // Handle analysis of text message
+  const handleAnalyzeText = async () => {
     if (!inputMessage.trim()) return
 
     setIsLoading(true)
-    setAnalysis(null)
-
-    // Simulate slight delay for UX
-    await new Promise(resolve => setTimeout(resolve, 500))
-
+    
     try {
-      // Use local keyword analyzer (no API needed)
-      const result = analyzeMessage(inputMessage)
-      const responses = generateResponses(inputMessage, result)
+      // Use the enhanced message analyzer
+      const messageAnalysis = analyzeMessage(inputMessage)
+      
+      // Generate responses based on the analysis
+      const responses = generateResponses(messageAnalysis.severity, messageAnalysis.categories)
       
       setAnalysis({
-        severity: result.severity,
-        categories: result.categories,
-        applicableLaws: result.applicableLaws || [],
+        severity: messageAnalysis.severity,
+        categories: messageAnalysis.categories,
+        summary: `Found ${messageAnalysis.categories.join(', ')} content`,
+        autoSelected: getRecommendedActions(messageAnalysis.severity),
         responses,
       })
     } catch (error) {
-      console.error('Analysis error:', error)
-      alert('Something went wrong. Please try again.')
+      console.error('Analysis failed:', error)
+      // Fallback analysis
+      const lowerText = inputMessage.toLowerCase()
+      let severity = 'Low'
+      let categories = []
+      
+      if (lowerText.includes('ugly') || lowerText.includes('stupid') || lowerText.includes('worthless')) {
+        severity = 'Medium'
+        categories = ['insults']
+      }
+      if (lowerText.includes('kill') || lowerText.includes('hurt')) {
+        severity = 'High'
+        categories = ['threats']
+      }
+
+      const responses = generateResponses(severity, categories)
+      
+      setAnalysis({
+        severity,
+        categories,
+        summary: `Analyzed message with ${categories.join(', ')} content`,
+        autoSelected: getRecommendedActions(severity),
+        responses,
+      })
     } finally {
       setIsLoading(false)
     }
   }
 
-  // Copy response to clipboard
+  const getRecommendedActions = (severity) => {
+    switch (severity) {
+      case 'High':
+        return ['Document Evidence', 'Legal Response', 'Report to DCI', 'Block User']
+      case 'Medium':
+        return ['Document Evidence', 'Calm Response', 'Set Boundaries']
+      default:
+        return ['Calm Response', 'Document Evidence']
+    }
+  }
+
+  // Handle analysis of imported evidence
+  const handleAnalyzeImportedEvidence = async () => {
+    if (importedEvidence.length === 0) return
+
+    setIsLoading(true)
+    
+    try {
+      // For imported evidence, analyze the first message content
+      const firstEvidence = importedEvidence[0]
+      const messageContent = firstEvidence.evidence?.content || ''
+      
+      if (messageContent) {
+        setInputMessage(messageContent)
+        const messageAnalysis = analyzeMessage(messageContent)
+        const responses = generateResponses(messageAnalysis.severity, messageAnalysis.categories)
+        
+        setAnalysis({
+          severity: messageAnalysis.severity,
+          categories: messageAnalysis.categories,
+          summary: `Found ${messageAnalysis.categories.join(', ')} content in imported evidence`,
+          autoSelected: getRecommendedActions(messageAnalysis.severity),
+          responses,
+        })
+      }
+    } catch (error) {
+      console.error('Analysis failed:', error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  // Auto-analyze when component loads with imported evidence
+  useEffect(() => {
+    if (importedEvidence.length > 0 && !analysis && !inputMessage) {
+      handleAnalyzeImportedEvidence()
+    }
+  }, [importedEvidence])
+
+  // Handle screenshot upload
+  const handleFileUpload = (event) => {
+    const files = Array.from(event.target.files)
+    const maxFiles = 5
+
+    files.forEach(file => {
+      if (attachedScreenshots.length >= maxFiles) {
+        alert(showSwahili ? 'Upeo wa picha 5 tu' : 'Maximum 5 screenshots allowed')
+        return
+      }
+
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        setAttachedScreenshots(prev => [...prev, {
+          id: Date.now(),
+          name: file.name,
+          data: e.target.result,
+        }])
+      }
+      reader.readAsDataURL(file)
+    })
+
+    event.target.value = ''
+  }
+
+  // Remove screenshot
+  const removeScreenshot = (id) => {
+    setAttachedScreenshots(prev => prev.filter(s => s.id !== id))
+  }
+
+  // Copy response
   const handleCopy = async (text, index) => {
     try {
       await navigator.clipboard.writeText(text)
@@ -121,244 +336,72 @@ function ResponseAssistant() {
     }
   }
 
-  // Temporarily reveal a blurred response
+  // Reveal blurred response
   const handleReveal = (index) => {
     setRevealedIndex(index)
-    // Auto-blur after 5 seconds
-    setTimeout(() => {
-      setRevealedIndex(null)
-    }, 5000)
+    setTimeout(() => setRevealedIndex(null), 5000)
   }
 
-  // Export responses as PDF with watermark and screenshots
-  const handleExportPDF = async () => {
-    if (!responsesRef.current) return
-
-    try {
-      // Temporarily reveal all for screenshot
-      const wasBlurred = blurredMode
-      setBlurredMode(false)
-      
-      await new Promise(resolve => setTimeout(resolve, 100))
-
-      const canvas = await html2canvas(responsesRef.current, {
-        scale: 2,
-        useCORS: true,
-        backgroundColor: '#F7F4ED',
-      })
-
-      const pdf = new jsPDF('p', 'mm', 'a4')
-      const pageWidth = 210
-      const pageHeight = 297
-      const margin = 10
-      const contentWidth = pageWidth - (margin * 2)
-
-      // Helper function to add watermark to a page
-      const addWatermark = () => {
-        pdf.setTextColor(75, 46, 131)
-        pdf.setFontSize(40)
-        pdf.setGState(new pdf.GState({ opacity: 0.1 }))
-        for (let y = 0; y < pageHeight; y += 50) {
-          pdf.text('PRIVATE - DO NOT SHARE', margin, y, { angle: 45 })
-        }
-        pdf.setGState(new pdf.GState({ opacity: 1 }))
-      }
-
-      // Page 1: Header and Response Templates
-      addWatermark()
-
-      // Add header
-      pdf.setFontSize(16)
-      pdf.setTextColor(75, 46, 131)
-      pdf.text('Digital Footprint Shield - Incident Report', margin, 15)
-      
-      pdf.setFontSize(10)
-      pdf.setTextColor(26, 26, 26)
-      pdf.text(`Generated: ${new Date().toLocaleDateString('en-KE')} at ${new Date().toLocaleTimeString('en-KE')}`, margin, 22)
-      pdf.text('Kenya Legal Reference: Computer Misuse and Cybercrimes Act 2018', margin, 28)
-
-      // Add severity and analysis info if available
-      if (analysis) {
-        pdf.setFontSize(10)
-        pdf.setTextColor(75, 46, 131)
-        pdf.text(`Severity: ${analysis.severity.toUpperCase()}`, margin, 36)
-        pdf.text(`Categories: ${analysis.categories.join(', ')}`, margin, 42)
-      }
-
-      // Add response templates image
-      const imgWidth = contentWidth
-      const imgHeight = (canvas.height * imgWidth) / canvas.width
-      pdf.addImage(canvas.toDataURL('image/png'), 'PNG', margin, 50, imgWidth, Math.min(imgHeight, 200))
-
-      // Add footer
-      pdf.setFontSize(8)
-      pdf.setTextColor(100, 100, 100)
-      pdf.text('Kenya Emergency: DCI Cybercrime 0800 723 253 | GBV Hotline 1195 | Police 999', margin, pageHeight - 10)
-      pdf.text(`Page 1 of ${1 + Math.ceil(attachedScreenshots.length / 2)}`, pageWidth - 25, pageHeight - 10)
-
-      // Add screenshots on subsequent pages (2 per page)
-      if (attachedScreenshots.length > 0) {
-        let screenshotIndex = 0
-        
-        while (screenshotIndex < attachedScreenshots.length) {
-          pdf.addPage()
-          addWatermark()
-
-          // Page header
-          pdf.setFontSize(14)
-          pdf.setTextColor(75, 46, 131)
-          pdf.text('Evidence Screenshots', margin, 15)
-          
-          pdf.setFontSize(9)
-          pdf.setTextColor(100, 100, 100)
-          pdf.text('These screenshots were attached as evidence of the incident.', margin, 22)
-
-          // Add up to 2 screenshots per page
-          for (let i = 0; i < 2 && screenshotIndex < attachedScreenshots.length; i++) {
-            const screenshot = attachedScreenshots[screenshotIndex]
-            const yPos = 30 + (i * 130)
-            
-            // Screenshot label
-            pdf.setFontSize(9)
-            pdf.setTextColor(26, 26, 26)
-            pdf.text(`Screenshot ${screenshotIndex + 1}: ${screenshot.name}`, margin, yPos)
-            pdf.setTextColor(100, 100, 100)
-            pdf.text(`Captured: ${new Date(screenshot.timestamp).toLocaleString('en-KE')}`, margin, yPos + 5)
-
-            // Add screenshot image
-            try {
-              const img = new Image()
-              img.src = screenshot.data
-              
-              // Calculate dimensions to fit
-              const maxWidth = contentWidth
-              const maxHeight = 115
-              let imgW = maxWidth
-              let imgH = (img.height / img.width) * imgW
-              
-              if (imgH > maxHeight) {
-                imgH = maxHeight
-                imgW = (img.width / img.height) * imgH
-              }
-
-              pdf.addImage(screenshot.data, 'JPEG', margin, yPos + 8, imgW, imgH)
-            } catch (imgErr) {
-              pdf.setTextColor(200, 100, 100)
-              pdf.text('[Image could not be added]', margin, yPos + 20)
-            }
-
-            screenshotIndex++
-          }
-
-          // Page footer
-          pdf.setFontSize(8)
-          pdf.setTextColor(100, 100, 100)
-          pdf.text('CONFIDENTIAL - For legal/reporting purposes only', margin, pageHeight - 10)
-          pdf.text(`Page ${pdf.internal.getCurrentPageInfo().pageNumber} of ${1 + Math.ceil(attachedScreenshots.length / 2)}`, pageWidth - 25, pageHeight - 10)
-        }
-      }
-
-      // Save
-      const filename = `incident-report-${new Date().toISOString().split('T')[0]}.pdf`
-      pdf.save(filename)
-
-      // Restore blur state
-      if (wasBlurred) setBlurredMode(true)
-
-    } catch (err) {
-      console.error('PDF export error:', err)
-      alert(showSwahili 
-        ? 'Haikuweza kutengeneza PDF. Tafadhali jaribu tena.'
-        : 'Could not export PDF. Please try again.')
-    }
-  }
-
-  // Severity indicator colors and messages
+  // Severity config
   const severityConfig = {
-    low: { 
-      bg: 'bg-green-100', 
-      text: 'text-green-700', 
-      label: 'Low Severity',
-      labelSw: 'Ukali wa Chini',
-    },
-    medium: { 
-      bg: 'bg-yellow-100', 
-      text: 'text-yellow-700', 
-      label: 'Medium Severity',
-      labelSw: 'Ukali wa Wastani',
-    },
-    high: { 
-      bg: 'bg-orange-100', 
-      text: 'text-orange-700', 
-      label: 'High Severity',
-      labelSw: 'Ukali wa Juu',
-    },
-    severe: { 
-      bg: 'bg-red-100', 
-      text: 'text-red-700', 
-      label: 'Severe - Consider Reporting',
-      labelSw: 'Mkali Sana - Fikiria Kuripoti',
-    },
+    Low: { bg: 'bg-green-100', text: 'text-green-700', label: 'Low Severity', labelSw: 'Ukali wa Chini' },
+    Medium: { bg: 'bg-yellow-100', text: 'text-yellow-700', label: 'Medium Severity', labelSw: 'Ukali wa Wastani' },
+    High: { bg: 'bg-orange-100', text: 'text-orange-700', label: 'High Severity', labelSw: 'Ukali wa Juu' },
   }
+
+  const currentSeverityConfig = severityConfig[analysis?.severity] || severityConfig.Low
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6 animate-slide-up">
+    <div className="max-w-2xl mx-auto p-6 space-y-6">
       {/* Header */}
-      <div className="text-center">
-        <h2 className="text-2xl font-bold text-deep-purple mb-2">
-          {showSwahili ? 'Msaidizi wa Majibu' : 'Response Assistant'}
-        </h2>
-        <p className="text-charcoal/70">
-          {showSwahili 
-            ? 'Bandika ujumbe wa unyanyasaji hapa chini na upate violezo 4 vya majibu.'
-            : 'Paste a harassment message below and get 4 response templates.'}
-        </p>
-        
-        {/* Language toggle */}
-        <button
-          onClick={() => setShowSwahili(!showSwahili)}
-          className="mt-3 px-4 py-1.5 rounded-full text-sm font-medium
-                     bg-light-lilac text-deep-purple hover:bg-deep-purple hover:text-white
-                     transition-all"
-        >
-          {showSwahili ? '🇬🇧 English' : '🇰🇪 Kiswahili'}
+      <div className="flex items-center justify-between">
+        <button onClick={onBack} className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 flex items-center gap-2">
+          ← {showSwahili ? 'Rudi kwa Ushahidi' : 'Back to Evidence'}
         </button>
+        
+        {importedEvidence.length > 0 && (
+          <div className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-medium">
+            ✅ {importedEvidence.length} {showSwahili ? 'ushahidi ulioingizwa' : 'evidence imported'}
+          </div>
+        )}
       </div>
 
-      {/* Input section */}
-      <div className="card">
-        <label className="block text-sm font-semibold text-charcoal mb-2">
-          {showSwahili ? 'Bandika ujumbe uliopokea:' : 'Paste the message you received:'}
+      <div className="text-center">
+        <h2 className="text-2xl font-bold text-gray-800 mb-2">
+          {showSwahili ? 'Msaidizi wa Majibu' : 'Response Assistant'}
+        </h2>
+        <p className="text-gray-600">
+          {showSwahili 
+            ? 'Bandika ujumbe wa unyanyasaji na upate majibu 4 ya kukulinda'
+            : 'Paste harassment messages and get 4 protective responses'}
+        </p>
+      </div>
+
+      {/* Input Section */}
+      <div className="bg-white rounded-xl border border-gray-200 p-4">
+        <label className="block text-sm font-semibold text-gray-800 mb-2">
+          {showSwahili ? 'Ujumbe uliopokea:' : 'Message you received:'}
         </label>
         <textarea
           value={inputMessage}
           onChange={(e) => setInputMessage(e.target.value)}
           placeholder={showSwahili 
-            ? "Bandika ujumbe wa unyanyasaji au vitisho hapa..."
-            : "Paste the harassment or threatening message here..."}
-          className="textarea-field h-32"
+            ? "Bandika ujumbe wa unyanyasaji hapa..."
+            : "Paste the harassment message here..."}
+          className="w-full h-32 p-3 border border-gray-300 rounded-lg focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
         />
 
-        {/* Screenshot Upload Section */}
-        <div className="mt-4 p-4 border-2 border-dashed border-light-lilac rounded-xl bg-light-lilac/10">
+        {/* Screenshot Upload */}
+        <div className="mt-4 p-4 border-2 border-dashed border-gray-300 rounded-lg">
           <div className="flex items-center justify-between mb-3">
-            <label className="text-sm font-medium text-charcoal flex items-center gap-2">
-              📸 {showSwahili ? 'Ambatanisha Picha za Skrini (Ushahidi)' : 'Attach Screenshots (Evidence)'}
-              <span className="text-xs text-charcoal/50">
-                ({attachedScreenshots.length}/5)
-              </span>
+            <label className="text-sm font-medium text-gray-800 flex items-center gap-2">
+              📸 {showSwahili ? 'Picha za Skrini' : 'Screenshots'}
+              <span className="text-xs text-gray-500">({attachedScreenshots.length}/5)</span>
             </label>
             <button
-              type="button"
               onClick={() => fileInputRef.current?.click()}
-              disabled={attachedScreenshots.length >= 5}
-              className="px-3 py-1.5 bg-deep-purple text-white text-sm rounded-lg
-                         hover:bg-deep-purple/90 disabled:opacity-50 disabled:cursor-not-allowed
-                         transition-all flex items-center gap-1"
+              className="px-3 py-1.5 bg-purple-600 text-white text-sm rounded-lg hover:bg-purple-700"
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
               {showSwahili ? 'Ongeza' : 'Add'}
             </button>
             <input
@@ -371,214 +414,87 @@ function ResponseAssistant() {
             />
           </div>
 
-          {/* Attached Screenshots Preview */}
-          {attachedScreenshots.length > 0 ? (
-            <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+          {attachedScreenshots.length > 0 && (
+            <div className="grid grid-cols-5 gap-2">
               {attachedScreenshots.map((screenshot) => (
-                <div key={screenshot.id} className="relative group">
+                <div key={screenshot.id} className="relative">
+                  <img
+                    src={screenshot.data}
+                    alt="Screenshot"
+                    className="w-full h-16 object-cover rounded border"
+                  />
                   <button
-                    type="button"
-                    onClick={() => openPreview(screenshot)}
-                    className="w-full aspect-square rounded-lg overflow-hidden border-2 border-light-lilac
-                               hover:border-deep-purple transition-all"
-                  >
-                    <img
-                      src={screenshot.data}
-                      alt={screenshot.name}
-                      className="w-full h-full object-cover"
-                    />
-                  </button>
-                  <button
-                    type="button"
                     onClick={() => removeScreenshot(screenshot.id)}
-                    className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full
-                               flex items-center justify-center text-xs font-bold
-                               opacity-0 group-hover:opacity-100 transition-opacity
-                               hover:bg-red-600"
-                    title={showSwahili ? 'Ondoa' : 'Remove'}
+                    className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white rounded-full text-xs"
                   >
                     ✕
                   </button>
                 </div>
               ))}
             </div>
-          ) : (
-            <div className="text-center py-4">
-              <p className="text-sm text-charcoal/50">
-                {showSwahili 
-                  ? 'Bonyeza "Ongeza" kupakia picha za skrini za ujumbe wa unyanyasaji'
-                  : 'Click "Add" to upload screenshots of harassment messages'}
-              </p>
-              <p className="text-xs text-charcoal/40 mt-1">
-                PNG, JPG • Max 5MB {showSwahili ? 'kwa faili' : 'per file'}
-              </p>
-            </div>
           )}
         </div>
-        
-        <div className="flex flex-col sm:flex-row gap-3 mt-4">
-          <button
-            onClick={handleAnalyze}
-            disabled={!inputMessage.trim() || isLoading}
-            className="btn-primary flex-1 disabled:opacity-50"
-          >
-            {isLoading ? (
-              <span className="flex items-center justify-center gap-2">
-                <svg className="animate-spin w-5 h-5" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                </svg>
-                {showSwahili ? 'Inachambua...' : 'Analyzing...'}
-              </span>
-            ) : (
-              showSwahili ? '🔍 Tengeneza Majibu' : '🔍 Generate Responses'
-            )}
-          </button>
-          
-          <button
-            onClick={() => {
-              setInputMessage('')
-              setAttachedScreenshots([])
-            }}
-            className="btn-secondary"
-            disabled={!inputMessage && attachedScreenshots.length === 0}
-          >
-            {showSwahili ? 'Futa Yote' : 'Clear All'}
-          </button>
-        </div>
 
-        {/* Privacy note */}
-        <p className="text-xs text-charcoal/50 mt-3 text-center">
-          🔒 {showSwahili 
-            ? 'Uchambuzi na picha zinabaki kwenye kifaa chako. Hakuna kinachotumwa kwa seva.'
-            : 'Analysis and images stay on your device. Nothing is sent to any server.'}
-        </p>
+        <button
+          onClick={handleAnalyzeText}
+          disabled={!inputMessage.trim() || isLoading}
+          className="w-full mt-4 py-3 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 disabled:opacity-50"
+        >
+          {isLoading 
+            ? (showSwahili ? 'Inachambua...' : 'Analyzing...')
+            : (showSwahili ? '🔍 Tengeneza Majibu' : '🔍 Generate Responses')
+          }
+        </button>
       </div>
 
-      {/* Image Preview Modal */}
-      {previewImage && (
-        <div 
-          className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4"
-          onClick={closePreview}
-        >
-          <div className="relative max-w-4xl max-h-[90vh] w-full">
-            <button
-              onClick={closePreview}
-              className="absolute -top-10 right-0 text-white hover:text-sunrise-orange transition-colors"
-            >
-              <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-            <img
-              src={previewImage.data}
-              alt={previewImage.name}
-              className="w-full h-full object-contain rounded-lg"
-              onClick={(e) => e.stopPropagation()}
-            />
-            <p className="text-center text-white/70 text-sm mt-2">
-              {previewImage.name} • {new Date(previewImage.timestamp).toLocaleString()}
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* Results section */}
+      {/* Analysis Results */}
       {analysis && (
         <div className="space-y-4">
-          {/* Severity indicator */}
-          <div className={`card ${severityConfig[analysis.severity].bg}`}>
+          {/* Severity Indicator */}
+          <div className={`p-4 rounded-xl ${currentSeverityConfig.bg}`}>
             <div className="flex items-center gap-3">
               <span className="text-2xl">
-                {analysis.severity === 'severe' ? '🚨' : 
-                 analysis.severity === 'high' ? '⚠️' :
-                 analysis.severity === 'medium' ? '⚡' : 'ℹ️'}
+                {analysis.severity === 'High' ? '⚠️' : 
+                 analysis.severity === 'Medium' ? 'ℹ️' : '🕊️'}
               </span>
               <div>
-                <p className={`font-semibold ${severityConfig[analysis.severity].text}`}>
+                <p className={`font-semibold ${currentSeverityConfig.text}`}>
                   {showSwahili 
-                    ? severityConfig[analysis.severity].labelSw 
-                    : severityConfig[analysis.severity].label}
+                    ? currentSeverityConfig.labelSw 
+                    : currentSeverityConfig.label}
                 </p>
-                <p className="text-sm text-charcoal/70">
-                  {showSwahili ? 'Imegunduliwa' : 'Detected'}: {analysis.categories.join(', ')}
+                <p className="text-sm text-gray-700 mt-1">
+                  {analysis.summary}
                 </p>
+                {analysis.categories && analysis.categories.length > 0 && (
+                  <p className="text-sm text-gray-700 mt-1">
+                    <strong>{showSwahili ? 'Aina:' : 'Categories:'}</strong> {analysis.categories.join(', ')}
+                  </p>
+                )}
+                {analysis.autoSelected && (
+                  <p className="text-sm text-gray-700 mt-1">
+                    <strong>{showSwahili ? 'Mapendekezo:' : 'Recommended:'}</strong> {analysis.autoSelected.join(', ')}
+                  </p>
+                )}
               </div>
             </div>
-            
-            {/* Kenya Legal Information */}
-            {analysis.applicableLaws && analysis.applicableLaws.length > 0 && (
-              <div className="mt-3 p-3 bg-white/50 rounded-lg">
-                <p className="text-sm font-semibold text-charcoal mb-2">
-                  🇰🇪 {showSwahili ? 'Sheria za Kenya Zinazohusika:' : 'Applicable Kenya Laws:'}
-                </p>
-                <ul className="text-sm text-charcoal/80 space-y-1">
-                  {analysis.applicableLaws.map((law, idx) => (
-                    <li key={idx} className="flex items-start gap-2">
-                      <span className="text-deep-purple">⚖️</span>
-                      <span><strong>{law.name}</strong> - {law.description}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-            
-            {analysis.severity === 'severe' && (
-              <div className="mt-3 p-3 bg-white/50 rounded-lg border-l-4 border-red-500">
-                <p className="text-sm text-red-700">
-                  <strong>⚠️ {showSwahili ? 'Muhimu' : 'Important'}:</strong>{' '}
-                  {showSwahili 
-                    ? 'Ujumbe huu unaweza kuwa na vitisho. Fikiria kuripoti kwa DCI (0800 723 253) au piga simu 1195 kwa msaada.'
-                    : 'This message may contain serious threats. Consider reporting to DCI Cybercrime Unit (0800 723 253) or call 1195 for support.'}
-                </p>
-              </div>
-            )}
           </div>
 
-          {/* Kenya Emergency Quick Actions */}
-          <div className="flex flex-wrap gap-2 justify-center">
-            <a 
-              href="tel:0800723253" 
-              className="px-4 py-2 bg-red-100 text-red-700 rounded-full text-sm font-medium
-                         hover:bg-red-200 transition-colors flex items-center gap-2"
-            >
-              📞 DCI Cybercrime
-            </a>
-            <a 
-              href="tel:1195" 
-              className="px-4 py-2 bg-purple-100 text-purple-700 rounded-full text-sm font-medium
-                         hover:bg-purple-200 transition-colors flex items-center gap-2"
-            >
-              💜 GBV Hotline 1195
-            </a>
-            <a 
-              href="tel:999" 
-              className="px-4 py-2 bg-orange-100 text-orange-700 rounded-full text-sm font-medium
-                         hover:bg-orange-200 transition-colors flex items-center gap-2"
-            >
-              🚨 Emergency 999
-            </a>
-          </div>
-
-          {/* Blur toggle */}
-          <div className="flex items-center justify-between p-3 bg-light-lilac/50 rounded-xl">
-            <span className="text-sm text-charcoal/70">
-              🛡️ {showSwahili ? 'Hali ya kuficha (kuzuia picha za skrini)' : 'Blurred preview (anti-screenshot)'}
+          {/* Blur Toggle */}
+          <div className="flex items-center justify-between p-3 bg-gray-100 rounded-lg">
+            <span className="text-sm text-gray-700">
+              🛡️ {showSwahili ? 'Ficha Majibu' : 'Blur Responses'}
             </span>
             <button
               onClick={() => setBlurredMode(!blurredMode)}
-              className={`relative w-12 h-6 rounded-full transition-colors
-                ${blurredMode ? 'bg-deep-purple' : 'bg-charcoal/30'}`}
+              className={`w-12 h-6 rounded-full transition-colors ${blurredMode ? 'bg-purple-600' : 'bg-gray-400'}`}
             >
-              <span 
-                className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform
-                  ${blurredMode ? 'left-7' : 'left-1'}`}
-              />
+              <span className={`block w-4 h-4 bg-white rounded-full transition-transform ${blurredMode ? 'translate-x-7' : 'translate-x-1'}`} />
             </button>
           </div>
 
-          {/* Response templates */}
-          <div ref={responsesRef} className="space-y-4">
+          {/* Response Templates */}
+          <div className="space-y-4">
             {analysis.responses.map((response, index) => (
               <ResponseCard
                 key={index}
@@ -586,124 +502,77 @@ function ResponseAssistant() {
                 index={index}
                 isBlurred={blurredMode && revealedIndex !== index}
                 onReveal={() => handleReveal(index)}
-                onCopy={() => handleCopy(
-                  showSwahili && response.textSw ? response.textSw : response.text, 
-                  index
-                )}
+                onCopy={() => handleCopy(showSwahili ? response.textSw : response.text, index)}
                 isCopied={copiedIndex === index}
                 showSwahili={showSwahili}
               />
             ))}
           </div>
-
-          {/* Export button */}
-          <div className="flex flex-col items-center gap-3">
-            {attachedScreenshots.length > 0 && (
-              <p className="text-sm text-charcoal/60 flex items-center gap-2">
-                <span className="text-green-500">✓</span>
-                {attachedScreenshots.length} {showSwahili ? 'picha za skrini zitajumuishwa' : 'screenshot(s) will be included'}
-              </p>
-            )}
-            <button onClick={handleExportPDF} className="btn-secondary flex items-center gap-2">
-              📄 {showSwahili ? 'Hamisha Ripoti ya PDF' : 'Export PDF Report'}
-              {attachedScreenshots.length > 0 && (
-                <span className="px-2 py-0.5 bg-deep-purple/20 rounded-full text-xs">
-                  +{attachedScreenshots.length} 📸
-                </span>
-              )}
-            </button>
-          </div>
-
-          {/* Screenshot protection notice */}
-          <div className="text-center text-xs text-charcoal/50">
-            <p>
-              ⚠️ {showSwahili 
-                ? 'PDF zilizohifadhiwa zina alama ya "Private - Do Not Share".'
-                : 'Exported PDFs include a "Private - Do Not Share" watermark.'}
-            </p>
-            <p className="mt-1">
-              {showSwahili 
-                ? 'Kumbuka: Ulinzi wa picha za skrini ni kuzuia, si dhamana.'
-                : 'Note: Screenshot protection is a deterrent, not a guarantee.'}
-            </p>
-          </div>
         </div>
       )}
+
+      {/* Emergency Contacts */}
+      <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+        <h3 className="font-semibold text-red-800 mb-3">
+          🆘 {showSwahili ? 'Nambari za Dharura za Kenya' : 'Kenya Emergency Contacts'}
+        </h3>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          <a href="tel:999" className="p-3 bg-white rounded-lg text-center hover:shadow-md">
+            <div className="font-semibold">999</div>
+            <div className="text-sm text-gray-600">{showSwahili ? 'Polisi' : 'Police'}</div>
+          </a>
+          <a href="tel:1195" className="p-3 bg-white rounded-lg text-center hover:shadow-md">
+            <div className="font-semibold">1195</div>
+            <div className="text-sm text-gray-600">{showSwahili ? 'GBV' : 'GBV Hotline'}</div>
+          </a>
+          <a href="tel:0800723253" className="p-3 bg-white rounded-lg text-center hover:shadow-md">
+            <div className="font-semibold">0800 723 253</div>
+            <div className="text-sm text-gray-600">{showSwahili ? 'DCI Mitandao' : 'DCI Cybercrime'}</div>
+          </a>
+        </div>
+      </div>
     </div>
   )
 }
 
-/**
- * Individual Response Card Component
- */
+// Response Card Component (keep this the same as before)
 function ResponseCard({ response, index, isBlurred, onReveal, onCopy, isCopied, showSwahili }) {
   const typeStyles = {
-    calm: { 
-      icon: '🕊️', 
-      color: 'border-blue-200 bg-blue-50',
-      label: 'Calm Response',
-      labelSw: 'Jibu la Utulivu',
-    },
-    legal: { 
-      icon: '⚖️', 
-      color: 'border-purple-200 bg-purple-50',
-      label: 'Legal Response (Kenya)',
-      labelSw: 'Jibu la Kisheria (Kenya)',
-    },
-    supportive: { 
-      icon: '💜', 
-      color: 'border-pink-200 bg-pink-50',
-      label: 'Supportive Response',
-      labelSw: 'Jibu la Kusaidia',
-    },
-    report: { 
-      icon: '📋', 
-      color: 'border-orange-200 bg-orange-50',
-      label: 'Report Template',
-      labelSw: 'Kiolezo cha Ripoti',
-    },
+    calm: { icon: '🕊️', color: 'border-blue-200 bg-blue-50', label: 'Calm Response', labelSw: 'Jibu la Utulivu' },
+    legal: { icon: '⚖️', color: 'border-purple-200 bg-purple-50', label: 'Legal Response', labelSw: 'Jibu la Kisheria' },
+    supportive: { icon: '💜', color: 'border-pink-200 bg-pink-50', label: 'Supportive Response', labelSw: 'Jibu la Kusaidia' },
+    report: { icon: '📋', color: 'border-orange-200 bg-orange-50', label: 'Report Template', labelSw: 'Kiolezo cha Ripoti' },
+    emergency: { icon: '🚨', color: 'border-red-200 bg-red-50', label: 'Emergency Response', labelSw: 'Jibu la Dharura' },
   }
 
   const style = typeStyles[response.type] || typeStyles.calm
-  const displayText = showSwahili && response.textSw ? response.textSw : response.text
-  const displayNote = showSwahili && response.noteSw ? response.noteSw : response.note
+  const displayText = showSwahili ? response.textSw : response.text
+  const displayNote = showSwahili ? response.noteSw : response.note
 
   return (
-    <div className={`card border-2 ${style.color} relative overflow-hidden`}>
-      {/* Watermark overlay (visible when not blurred) */}
-      {!isBlurred && (
-        <div className="watermark-overlay">
-          Private — Do not share
-        </div>
-      )}
-
-      {/* Header */}
+    <div className={`border-2 rounded-xl p-4 ${style.color}`}>
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <span className="text-xl">{style.icon}</span>
-          <h4 className="font-semibold text-charcoal">
+          <h4 className="font-semibold text-gray-800">
             {showSwahili ? style.labelSw : style.label}
           </h4>
         </div>
-        <span className="text-xs text-charcoal/50">
+        <span className="text-xs text-gray-500">
           {showSwahili ? `Kiolezo ${index + 1}` : `Template ${index + 1}`}
         </span>
       </div>
 
-      {/* Response text */}
       <div className="relative">
-        <p className={`text-charcoal/80 leading-relaxed transition-all duration-300 whitespace-pre-line
-          ${isBlurred ? 'blurred-preview' : ''}`}>
+        <p className={`text-gray-700 leading-relaxed whitespace-pre-line ${isBlurred ? 'blur-md' : ''}`}>
           {displayText}
         </p>
 
-        {/* Reveal button overlay (when blurred) */}
         {isBlurred && (
           <div className="absolute inset-0 flex items-center justify-center">
             <button
               onClick={onReveal}
-              className="px-4 py-2 bg-deep-purple text-white rounded-xl 
-                         shadow-medium hover:shadow-glow transition-all"
+              className="px-4 py-2 bg-purple-600 text-white rounded-lg shadow-lg"
             >
               👁️ {showSwahili ? 'Onyesha kwa sekunde 5' : 'Reveal for 5 seconds'}
             </button>
@@ -711,24 +580,22 @@ function ResponseCard({ response, index, isBlurred, onReveal, onCopy, isCopied, 
         )}
       </div>
 
-      {/* Usage note */}
-      <p className="text-xs text-charcoal/50 mt-3 italic">
+      <p className="text-sm text-gray-600 mt-3 italic">
         {displayNote}
       </p>
 
-      {/* Copy button */}
       <button
         onClick={onCopy}
         disabled={isBlurred}
-        className={`mt-3 w-full py-2 rounded-xl text-sm font-medium transition-all
-          ${isCopied 
+        className={`w-full mt-3 py-2 rounded-lg font-medium ${
+          isCopied 
             ? 'bg-green-500 text-white' 
-            : 'bg-light-lilac text-deep-purple hover:bg-deep-purple hover:text-white'}
-          ${isBlurred ? 'opacity-50 cursor-not-allowed' : ''}`}
+            : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
+        } ${isBlurred ? 'opacity-50' : ''}`}
       >
         {isCopied 
           ? (showSwahili ? '✓ Imenakiliwa!' : '✓ Copied!') 
-          : (showSwahili ? '📋 Nakili kwenye Clipboard' : '📋 Copy to Clipboard')}
+          : '📋 Copy'}
       </button>
     </div>
   )

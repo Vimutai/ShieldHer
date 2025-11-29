@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Resize Footprint Icons</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        padding: 20px;
+        background: #f5f5f5;
+      }
+      .container {
+        background: white;
+        padding: 20px;
+        border-radius: 10px;
+        max-width: 500px;
+        margin: 0 auto;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      }
+      h3 {
+        color: #2c3e50;
+      }
+      .step {
+        margin: 15px 0;
+      }
+      .download-btn {
+        background: #3498db;
+        color: white;
+        padding: 10px 15px;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        margin: 5px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h3>🛡️ Footprint Shield - Icon Resizer</h3>
+
+      <div class="step">
+        <strong>Step 1:</strong> Upload any of your existing icons <br /><br />
+        <input type="file" id="fileInput" accept=".png,.ico,.jpg" />
+      </div>
+
+      <div class="step">
+        <strong>Step 2:</strong> Click to download all required sizes:
+        <br /><br />
+        <button class="download-btn" onclick="resizeIcons()">
+          📥 Download All Sizes
+        </button>
+      </div>
+
+      <div class="step">
+        <strong>Step 3:</strong> Save the downloaded files in your
+        <code>/icons/</code> folder as:
+        <ul>
+          <li><code>icon-16.png</code></li>
+          <li><code>icon-48.png</code></li>
+          <li><code>icon-128.png</code></li>
+        </ul>
+      </div>
+    </div>
+
+    <script>
+      let uploadedImage = null;
+
+      document
+        .getElementById("fileInput")
+        .addEventListener("change", function (e) {
+          const file = e.target.files[0];
+          if (!file) return;
+
+          const img = new Image();
+          img.onload = function () {
+            uploadedImage = img;
+            alert('✅ Image loaded! Now click "Download All Sizes"');
+          };
+          img.src = URL.createObjectURL(file);
+        });
+
+      function resizeIcons() {
+        if (!uploadedImage) {
+          alert("Please upload an image first!");
+          return;
+        }
+
+        const sizes = [
+          { name: "icon-16.png", size: 16 },
+          { name: "icon-48.png", size: 48 },
+          { name: "icon-128.png", size: 128 },
+        ];
+
+        sizes.forEach((item) => {
+          const canvas = document.createElement("canvas");
+          canvas.width = item.size;
+          canvas.height = item.size;
+          const ctx = canvas.getContext("2d");
+
+          // Draw and resize the image
+          ctx.drawImage(uploadedImage, 0, 0, item.size, item.size);
+
+          // Create download link
+          const link = document.createElement("a");
+          link.download = item.name;
+          link.href = canvas.toDataURL("image/png");
+          link.click();
+        });
+
+        alert("🎉 All 3 icons downloaded! Check your Downloads folder.");
+      }
+    </script>
+  </body>
+</html>

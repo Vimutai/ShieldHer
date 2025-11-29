@@ -1,60 +1,108 @@
-"""
-Digital Footprint Shield - Flask Backend (Optional)
-A minimal API server for enhanced functionality.
+# api/routes.py - Add to your existing routes
+from flask import Blueprint, request, jsonify
+import logging
 
-The frontend works fully without this backend.
-Use this backend when you want:
-- Server-side score calculation
-- Persistent incident storage
-- AI-powered analysis (with API keys)
+api_bp = Blueprint('api', __name__)
 
-Run with: flask run
-"""
-import os
-from flask import Flask
-from flask_cors import CORS
-from api.routes import api_bp
+# Add this new endpoint to your existing routes
+@api_bp.route('/analyze-evidence', methods=['POST'])
+def analyze_evidence():
+    """
+    Analyze harassment evidence and suggest responses
+    Expects: { "evidence": [{ "source": "twitter", "count": 3, "timestamp": "07:47:24" }, ...] }
+    Returns: Analysis with severity and recommended responses
+    """
+    try:
+        data = request.get_json()
+        
+        if not data or 'evidence' not in data:
+            return jsonify({'error': 'Evidence data is required'}), 400
+        
+        evidence_log = data['evidence']
+        
+        # Analyze the evidence
+        analysis_result = analyze_evidence_data(evidence_log)
+        
+        return jsonify(analysis_result)
+        
+    except Exception as e:
+        logging.error(f"Analysis error: {str(e)}")
+        return jsonify({'error': 'Analysis failed'}), 500
 
-# Initialize Flask app
-app = Flask(__name__)
-
-# Enable CORS for frontend communication
-CORS(app, origins=['http://localhost:5173', 'http://127.0.0.1:5173'])
-
-# Configuration
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-change-in-production')
-app.config['JSON_SORT_KEYS'] = False
-
-# Register API blueprint
-app.register_blueprint(api_bp, url_prefix='/api')
-
-
-@app.route('/')
-def index():
-    """Health check endpoint"""
+def analyze_evidence_data(evidence_log):
+    """Analyze evidence patterns and suggest responses"""
+    twitter_count = 0
+    unknown_count = 0
+    total_comments = 0
+    sources = set()
+    
+    # Analyze the evidence
+    for entry in evidence_log:
+        count = entry.get('count', 0)
+        source = entry.get('source', 'unknown')
+        
+        total_comments += count
+        sources.add(source)
+        
+        if source == 'twitter':
+            twitter_count += count
+        elif source == 'unknown':
+            unknown_count += count
+    
+    # Determine severity based on patterns
+    severity = calculate_severity(total_comments, len(sources), twitter_count, unknown_count)
+    
+    # Get recommended responses based on severity
+    recommended_responses = get_recommended_responses(severity)
+    
     return {
-        'status': 'ok',
-        'app': 'Digital Footprint Shield API',
-        'version': '1.0.0',
-        'endpoints': [
-            'POST /api/calculate-score',
-            'POST /api/generate-responses',
-            'POST /api/save-incident',
-            'GET /api/incidents',
-        ]
+        'severity': severity,
+        'summary': generate_summary(total_comments, sources, twitter_count, unknown_count),
+        'autoSelected': recommended_responses,
+        'analysis': {
+            'totalComments': total_comments,
+            'uniqueSources': len(sources),
+            'sourcesDetected': list(sources)
+        }
     }
 
+def calculate_severity(total_comments, unique_sources, twitter_count, unknown_count):
+    """Calculate severity level based on evidence patterns"""
+    if total_comments > 10 or unique_sources >= 3:
+        return 'High'
+    elif total_comments > 5 or (twitter_count > 0 and unknown_count > 0):
+        return 'Medium'
+    else:
+        return 'Low'
 
-@app.errorhandler(404)
-def not_found(e):
-    return {'error': 'Endpoint not found'}, 404
+def get_recommended_responses(severity):
+    """Get recommended response templates based on severity"""
+    responses = {
+        'High': [
+            'Document Evidence',
+            'Firm Response Template',
+            'Block User',
+            'Report to Platform'
+        ],
+        'Medium': [
+            'Calm Response Template 1',
+            'Set Boundaries',
+            'Document Evidence'
+        ],
+        'Low': [
+            'Calm Response Template 1',
+            'Ignore and Monitor'
+        ]
+    }
+    return responses.get(severity, [])
 
-
-@app.errorhandler(500)
-def server_error(e):
-    return {'error': 'Internal server error'}, 500
-
-
-if __name__ == '__main__':
-    # Development server
-    app.run(debug=True, port=5000)
+def generate_summary(total_comments, sources, twitter_count, unknown_count):
+    """Generate analysis summary"""
+    source_desc = []
+    if twitter_count > 0:
+        source_desc.append(f"{twitter_count} Twitter comments")
+    if unknown_count > 0:
+        source_desc.append(f"{unknown_count} unknown source comments")
+    
+    sources_text = " and ".join(source_desc)
+    return f"Found {total_comments} total comments from {sources_text} across {len(sources)} sources."

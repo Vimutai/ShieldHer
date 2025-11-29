@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Make Simple Icons</title>
+  </head>
+  <body>
+    <h3>Creating simple shield icons...</h3>
+    <script>
+      // Create simple colored shield icons
+      const sizes = [16, 48, 128];
+
+      sizes.forEach((size) => {
+        const canvas = document.createElement("canvas");
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext("2d");
+
+        // Blue background
+        ctx.fillStyle = "#3498db";
+        ctx.fillRect(0, 0, size, size);
+
+        // White shield symbol
+        ctx.fillStyle = "white";
+        ctx.font = `bold ${size * 0.6}px Arial`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText("🛡️", size / 2, size / 2);
+
+        // Download
+        const link = document.createElement("a");
+        link.download = `icon-${size}.png`;
+        link.href = canvas.toDataURL();
+        link.click();
+      });
+
+      alert("3 icons downloaded! Save them in your /icons/ folder.");
+    </script>
+  </body>
+</html>

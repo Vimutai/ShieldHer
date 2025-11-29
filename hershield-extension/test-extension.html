@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Test Footprint Extension</title>
+  </head>
+  <body>
+    <h2>🧪 Extension Test Page</h2>
+
+    <div id="status">Testing...</div>
+
+    <script>
+      // Test if extension is accessible
+      if (typeof chrome !== "undefined" && chrome.runtime) {
+        try {
+          chrome.runtime.sendMessage(
+            "fchhljbohkhfcabppbhkdpehnmjhegip",
+            { action: "test" },
+            (response) => {
+              document.getElementById("status").innerHTML =
+                "✅ Extension is accessible!";
+            }
+          );
+        } catch (e) {
+          document.getElementById("status").innerHTML =
+            "❌ Extension not accessible: " + e.message;
+        }
+      } else {
+        document.getElementById("status").innerHTML =
+          "❌ Chrome API not available";
+      }
+    </script>
+  </body>
+</html>
