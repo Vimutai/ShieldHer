@@ -276,7 +276,6 @@ function DigitalLiteracyHub() {
     { id: 'resources', label: showSwahili ? '🆘 Rasilimali' : '🆘 Resources', icon: '🆘' },
     { id: 'tutorials', label: showSwahili ? '🎓 Mafunzo' : '🎓 Tutorials', icon: '🎓' },
     { id: 'guides', label: showSwahili ? '📖 Miongozo' : '📖 Guides', icon: '📖' },
-    { id: 'quiz', label: showSwahili ? '🧠 Jaribio' : '🧠 Quiz', icon: '🧠' },
     { id: 'checklist', label: showSwahili ? '✅ Orodha' : '✅ Checklist', icon: '✅' },
     { id: 'challenges', label: showSwahili ? '🏆 Changamoto' : '🏆 Challenges', icon: '🏆' },
   ]
